@@ -1,58 +1,58 @@
 # ApeCode 🦧
 
-A nano terminal code agent in Python — a minimal but complete implementation of a tool-calling AI agent (like Claude Code / Codex CLI / Kimi CLI), built for learning and experimentation.
+一个用 Python 编写的纳米级终端代码代理 —— 一个最小但完整的工具调用 AI 代理实现（类似于 Claude Code / Codex CLI / Kimi CLI），专为学习和实验而构建。
 
-Powered by [ApeCode.ai](https://apecode.ai)
+由 [ApeCode.ai](https://apecode.ai) 提供支持
 
-## Features
+## 功能
 
-- **Tool-calling agent loop** — `user → model → tool calls → tool results → model → response`, with configurable max-steps guard
-- **Multi-provider model adapters** — OpenAI, Anthropic, and Kimi (OpenAI-compatible), all conforming to a unified `ChatModel` protocol
-- **7 built-in tools** — `list_files`, `read_file`, `write_file`, `replace_in_file`, `grep_files`, `exec_command`, `update_plan`
-- **Sandbox + approval model** — `SandboxMode` (read-only / workspace-write / danger-full-access) restricts path mutations; `ApprovalPolicy` (on-request / always / never) controls interactive confirmation for mutating operations
-- **Plugin system** — declarative `apecode_plugin.json` manifests contribute tools, slash commands, and skills
-- **MCP integration** — load external tools from `.mcp.json` / `apecode_mcp.json` via the `fastmcp` SDK
-- **Slash commands** — `/help`, `/tools`, `/skills`, `/skill`, `/plan`, `/subagents`, `/delegate`, `/exit`
-- **Subagent delegation** — isolated read-only agents with three default profiles: `general`, `reviewer`, `researcher`
-- **Skill templates** — discoverable from `skills/*/SKILL.md` directories or plugins
-- **REPL + one-shot mode** — interactive session with prompt-toolkit (history, tab-completion, multi-line via Alt+Enter) or single-prompt execution
-- **Thinking model support** — displays `reasoning_content` from thinking models (e.g. Kimi K2.5)
-- **AGENTS.md chain** — walks from workspace root to filesystem root, loading `AGENTS.md` files for project-specific instructions
+- **工具调用代理循环** — `用户 → 模型 → 工具调用 → 工具结果 → 模型 → 响应`，带有可配置的最大步数防护
+- **多提供商模型适配器** — OpenAI、Anthropic 和 Kimi（兼容 OpenAI），全部符合统一的 `ChatModel` 协议
+- **7 个内置工具** — `list_files`、`read_file`、`write_file`、`replace_in_file`、`grep_files`、`exec_command`、`update_plan`
+- **沙箱 + 审批模型** — `SandboxMode`（只读 / 工作区写入 / 危险完全访问）限制路径变更；`ApprovalPolicy`（按需 / 始终 / 从不）控制变更操作的交互式确认
+- **插件系统** — 声明式 `apecode_plugin.json` 清单提供工具、斜杠命令和技能
+- **MCP 集成** — 通过 `fastmcp` SDK 从 `.mcp.json` / `apecode_mcp.json` 加载外部工具
+- **斜杠命令** — `/help`、`/tools`、`/skills`、`/skill`、`/plan`、`/subagents`、`/delegate`、`/exit`
+- **子代理委派** — 具有三个默认配置文件的隔离只读代理：`general`、`reviewer`、`researcher`
+- **技能模板** — 从 `skills/*/SKILL.md` 目录或插件中发现
+- **REPL + 单次执行模式** — 带有 prompt-toolkit 的交互式会话（历史记录、制表符补全、通过 Alt+Enter 多行）或单个提示执行
+- **思考模型支持** — 显示思考模型的 `reasoning_content`（例如 Kimi K2.5）
+- **AGENTS.md 链** — 从工作区根目录遍历到文件系统根目录，加载 `AGENTS.md` 文件以获取项目特定说明
 
-## Installation
+## 安装
 
 ```bash
 uv sync
 ```
 
-Dependencies: `openai`, `anthropic`, `fastmcp`, `typer`, `rich`, `prompt-toolkit`.
+依赖项：`openai`、`anthropic`、`fastmcp`、`typer`、`rich`、`prompt-toolkit`。
 
-## Usage
+## 使用方法
 
-### API keys
+### API 密钥
 
 ```bash
-export OPENAI_API_KEY=your_key       # for provider=openai (default)
-export ANTHROPIC_API_KEY=your_key    # for provider=anthropic
-export KIMI_API_KEY=your_key         # for provider=kimi
+export OPENAI_API_KEY=your_key       # 用于 provider=openai（默认）
+export ANTHROPIC_API_KEY=your_key    # 用于 provider=anthropic
+export KIMI_API_KEY=your_key         # 用于 provider=kimi
 ```
 
-### Interactive REPL
+### 交互式 REPL
 
 ```bash
 uv run ape
 ```
 
-### One-shot mode
+### 单次执行模式
 
 ```bash
 uv run ape "read README.md and summarize project structure"
 ```
 
-### CLI flags
+### CLI 标志
 
 ```bash
-uv run ape --provider openai --model gpt-4.1-mini    # default
+uv run ape --provider openai --model gpt-4.1-mini    # 默认
 uv run ape --provider anthropic --model claude-sonnet-4-20250514
 uv run ape --provider kimi --model kimi-k2.5
 uv run ape --max-steps 30 --timeout 180
@@ -65,85 +65,85 @@ uv run ape --yolo "apply a simple refactor in src/"
 uv run ape --version
 ```
 
-### Slash commands (inside REPL)
+### 斜杠命令（在 REPL 内部）
 
 ```
-/help                                          — list all commands
-/tools                                         — list registered tools
-/skills                                        — list discovered skills
-/skill concise-review review src/apecode/cli.py — run a skill with extra request
-/plan                                          — show the current task plan
-/subagents                                     — list subagent profiles
-/delegate reviewer:: review src/apecode/cli.py — delegate to a subagent
-/exit                                          — quit
+/help                                          — 列出所有命令
+/tools                                         — 列出已注册的工具
+/skills                                        — 列出已发现的技能
+/skill concise-review review src/apecode/cli.py — 使用额外请求运行技能
+/plan                                          — 显示当前任务计划
+/subagents                                     — 列出子代理配置文件
+/delegate reviewer:: review src/apecode/cli.py — 委派给子代理
+/exit                                          — 退出
 ```
 
-## Architecture
+## 架构
 
 ```
-user input
+用户输入
     │
     ▼
 ┌──────────────────────────────────────────────┐
-│  cli.py — Typer app, _build_runtime, REPL    │
+│  cli.py — Typer 应用，_build_runtime，REPL    │
 │  ┌────────────────────────────────────────┐  │
 │  │  NanoCodeAgent (agent.py)              │  │
 │  │  ┌──────────┐    ┌──────────────────┐  │  │
 │  │  │ ChatModel │◄──│ model_adapters.py │  │  │
-│  │  │ protocol  │   │ OpenAI/Anthropic/ │  │  │
-│  │  │           │   │ Kimi adapters     │  │  │
+│  │  │ 协议      │   │ OpenAI/Anthropic/ │  │  │
+│  │  │           │   │ Kimi 适配器       │  │  │
 │  │  └──────────┘    └──────────────────┘  │  │
 │  │  ┌──────────────────────────────────┐  │  │
 │  │  │ ToolRegistry (tools.py)          │  │  │
-│  │  │  7 built-in + plugin + MCP tools │  │  │
-│  │  │  ToolContext: sandbox + approval  │  │  │
+│  │  │  7 个内置 + 插件 + MCP 工具      │  │  │
+│  │  │  ToolContext：沙箱 + 审批         │  │  │
 │  │  └──────────────────────────────────┘  │  │
 │  └────────────────────────────────────────┘  │
-│  commands.py — slash command registry        │
-│  plugins.py  — apecode_plugin.json loader    │
-│  mcp.py      — fastmcp stdio bridge          │
-│  skills.py   — SKILL.md discovery + catalog  │
-│  subagents.py — isolated read-only delegates │
-│  system_prompt.py — prompt builder + AGENTS.md│
-│  console.py  — Rich + prompt-toolkit I/O     │
+│  commands.py — 斜杠命令注册                 │
+│  plugins.py  — apecode_plugin.json 加载器   │
+│  mcp.py      — fastmcp stdio 桥接           │
+│  skills.py   — SKILL.md 发现 + 目录         │
+│  subagents.py — 隔离的只读委派               │
+│  system_prompt.py — 提示构建器 + AGENTS.md  │
+│  console.py  — Rich + prompt-toolkit I/O    │
 └──────────────────────────────────────────────┘
 ```
 
-### Module breakdown
+### 模块细分
 
-| Module | Purpose |
+| 模块 | 用途 |
 |---|---|
-| `cli.py` | Typer entry point, assembles runtime (`_build_runtime`), runs REPL or one-shot |
-| `agent.py` | `NanoCodeAgent` — the core tool-calling loop with `ChatModel` protocol |
-| `tools.py` | `ToolRegistry`, `ToolContext` (sandbox/approval), 7 built-in tool handlers |
-| `model_adapters.py` | `OpenAIChatCompletionsClient`, `AnthropicMessagesClient`, `KimiChatCompletionsClient` — all adapters convert to/from internal OpenAI message format |
-| `commands.py` | `CommandRegistry` + `SlashCommand` — `/help`, `/tools`, `/exit`, etc. |
-| `plugins.py` | Loads `apecode_plugin.json` manifests; registers tools, commands, skills |
-| `mcp.py` | Parses `.mcp.json`, connects via `fastmcp.Client`, registers MCP tools |
-| `skills.py` | `SkillCatalog` — discovers `SKILL.md` files, supports plugin-contributed skills |
-| `subagents.py` | `SubagentRunner` — spawns isolated agents with read-only tools and capped steps |
-| `system_prompt.py` | Builds system prompt with environment info, AGENTS.md chain, skill catalog |
-| `console.py` | Rich console output (panels, spinners, tool call display) + prompt-toolkit input session |
+| `cli.py` | Typer 入口点，组装运行时（`_build_runtime`），运行 REPL 或单次执行 |
+| `agent.py` | `NanoCodeAgent` — 使用 `ChatModel` 协议的核心工具调用循环 |
+| `tools.py` | `ToolRegistry`、`ToolContext`（沙箱/审批）、7 个内置工具处理程序 |
+| `model_adapters.py` | `OpenAIChatCompletionsClient`、`AnthropicMessagesClient`、`KimiChatCompletionsClient` — 所有适配器转换为/从内部 OpenAI 消息格式 |
+| `commands.py` | `CommandRegistry` + `SlashCommand` — `/help`、`/tools`、`/exit` 等 |
+| `plugins.py` | 加载 `apecode_plugin.json` 清单；注册工具、命令、技能 |
+| `mcp.py` | 解析 `.mcp.json`，通过 `fastmcp.Client` 连接，注册 MCP 工具 |
+| `skills.py` | `SkillCatalog` — 发现 `SKILL.md` 文件，支持插件提供的技能 |
+| `subagents.py` | `SubagentRunner` — 生成具有只读工具和限制步数的隔离代理 |
+| `system_prompt.py` | 使用环境信息、AGENTS.md 链、技能目录构建系统提示 |
+| `console.py` | Rich 控制台输出（面板、微调器、工具调用显示）+ prompt-toolkit 输入会话 |
 
-## Environment Variables
+## 环境变量
 
-| Variable | Default | Description |
+| 变量 | 默认值 | 描述 |
 |---|---|---|
-| `APECODE_PROVIDER` | `openai` | Model provider (`openai` / `anthropic` / `kimi`) |
-| `APECODE_MODEL` | `gpt-4.1-mini` | Model name |
-| `APECODE_SANDBOX_MODE` | `workspace-write` | Sandbox mode (`read-only` / `workspace-write` / `danger-full-access`) |
-| `APECODE_APPROVAL_POLICY` | `on-request` | Approval policy (`on-request` / `always` / `never`) |
-| `OPENAI_API_KEY` | — | OpenAI API key |
-| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | Custom OpenAI-compatible endpoint |
-| `ANTHROPIC_API_KEY` | — | Anthropic API key |
-| `ANTHROPIC_BASE_URL` | `https://api.anthropic.com/v1` | Custom Anthropic endpoint |
-| `ANTHROPIC_API_VERSION` | `2023-06-01` | Anthropic API version header |
-| `KIMI_API_KEY` | — | Kimi API key |
-| `KIMI_BASE_URL` | `https://api.moonshot.cn/v1` | Kimi endpoint |
+| `APECODE_PROVIDER` | `openai` | 模型提供商（`openai` / `anthropic` / `kimi`） |
+| `APECODE_MODEL` | `gpt-4.1-mini` | 模型名称 |
+| `APECODE_SANDBOX_MODE` | `workspace-write` | 沙箱模式（`read-only` / `workspace-write` / `danger-full-access`） |
+| `APECODE_APPROVAL_POLICY` | `on-request` | 审批策略（`on-request` / `always` / `never`） |
+| `OPENAI_API_KEY` | — | OpenAI API 密钥 |
+| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | 自定义 OpenAI 兼容端点 |
+| `ANTHROPIC_API_KEY` | — | Anthropic API 密钥 |
+| `ANTHROPIC_BASE_URL` | `https://api.anthropic.com/v1` | 自定义 Anthropic 端点 |
+| `ANTHROPIC_API_VERSION` | `2023-06-01` | Anthropic API 版本头 |
+| `KIMI_API_KEY` | — | Kimi API 密钥 |
+| `KIMI_BASE_URL` | `https://api.moonshot.cn/v1` | Kimi 端点 |
 
-## Plugin System
+## 插件系统
 
-Place a plugin manifest as `apecode_plugin.json` in a plugin directory:
+将插件清单作为 `apecode_plugin.json` 放置在插件目录中：
 
 ```json
 {
@@ -151,7 +151,7 @@ Place a plugin manifest as `apecode_plugin.json` in a plugin directory:
   "tools": [
     {
       "name": "echo_text",
-      "description": "Echo text from JSON args",
+      "description": "从 JSON 参数中回显文本",
       "parameters": {
         "type": "object",
         "properties": { "text": { "type": "string" } },
@@ -166,30 +166,30 @@ Place a plugin manifest as `apecode_plugin.json` in a plugin directory:
   "commands": [
     {
       "name": "quick-review",
-      "description": "Run plugin prompt template",
+      "description": "运行插件提示模板",
       "usage": "/quick-review <task>",
-      "output": "Running quick review...",
-      "agent_input_template": "Review this task:\\n{args}"
+      "output": "正在运行快速审查...",
+      "agent_input_template": "审查此任务：\\n{args}"
     }
   ],
   "skills": [
     {
       "name": "plugin-skill",
-      "description": "A plugin-provided skill",
-      "content": "# Plugin Skill\\n\\nKeep output concise."
+      "description": "一个插件提供的技能",
+      "content": "# 插件技能\\n\\n保持输出简洁。"
     }
   ]
 }
 ```
 
-- Tools use either `argv` (recommended) or `command` to specify the executable.
-- Tool processes receive JSON arguments on `stdin` and write results to `stdout`.
-- Commands support `{args}` placeholder in `agent_input_template`.
-- Skills can use inline `content` or a `file` path relative to the manifest.
+- 工具使用 `argv`（推荐）或 `command` 来指定可执行文件。
+- 工具进程在 `stdin` 上接收 JSON 参数，并将结果写入 `stdout`。
+- 命令在 `agent_input_template` 中支持 `{args}` 占位符。
+- 技能可以使用内联 `content` 或相对于清单的 `file` 路径。
 
-## MCP Config
+## MCP 配置
 
-Load MCP tools from `.mcp.json` or `apecode_mcp.json` in workspace root, or via `--mcp-config`:
+从工作区根目录中的 `.mcp.json` 或 `apecode_mcp.json` 加载 MCP 工具，或通过 `--mcp-config`：
 
 ```json
 {
@@ -203,60 +203,60 @@ Load MCP tools from `.mcp.json` or `apecode_mcp.json` in workspace root, or via 
 }
 ```
 
-## Skills
+## 技能
 
-Create a skill as `skills/<name>/SKILL.md`:
+在 `skills/<name>/SKILL.md` 中创建一个技能：
 
 ```markdown
 # concise-review
 
-Review code and answer with concise bullet points.
+审查代码并用简洁的项目符号回答。
 ```
 
-Use inside REPL:
+在 REPL 内部使用：
 
 ```
 /skill concise-review review src/apecode/agent.py
 ```
 
-## Development
+## 开发
 
 ```bash
-# Install dev dependencies
+# 安装开发依赖
 uv sync
 
-# Run tests
+# 运行测试
 uv run pytest
 
-# Run a single test file
+# 运行单个测试文件
 uv run pytest tests/test_tools.py -v
 
-# Lint
+# 检查代码
 uv run ruff check src/ tests/
 
-# Lint with auto-fix
+# 自动修复代码
 uv run ruff check --fix src/ tests/
 
-# Format
+# 格式化代码
 uv run ruff format src/ tests/
 ```
 
-## Project Structure
+## 项目结构
 
 ```
 src/apecode/
-├── __init__.py          # package version
-├── __main__.py          # python -m apecode entry
-├── cli.py               # Typer CLI app + runtime assembly
-├── agent.py             # NanoCodeAgent core loop
-├── tools.py             # tool registry + built-in tools
-├── model_adapters.py    # model adapters (OpenAI/Anthropic/Kimi)
-├── commands.py          # slash command framework
-├── plugins.py           # plugin manifest loader
-├── mcp.py               # MCP stdio bridge
-├── skills.py            # skill discovery + catalog
-├── subagents.py         # subagent delegation
-├── system_prompt.py     # system prompt builder
+├── __init__.py          # 包版本
+├── __main__.py          # python -m apecode 入口
+├── cli.py               # Typer CLI 应用 + 运行时组装
+├── agent.py             # NanoCodeAgent 核心循环
+├── tools.py             # 工具注册 + 内置工具
+├── model_adapters.py    # 模型适配器（OpenAI/Anthropic/Kimi）
+├── commands.py          # 斜杠命令框架
+├── plugins.py           # 插件清单加载器
+├── mcp.py               # MCP stdio 桥接
+├── skills.py            # 技能发现 + 目录
+├── subagents.py         # 子代理委派
+├── system_prompt.py     # 系统提示构建器
 └── console.py           # Rich + prompt-toolkit I/O
 tests/
 ├── test_agent.py
@@ -269,6 +269,6 @@ tests/
 └── test_tools.py
 ```
 
-## License
+## 许可证
 
 Apache-2.0
