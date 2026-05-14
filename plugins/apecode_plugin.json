@@ -1,0 +1,34 @@
+{
+  "name": "EchoPlugin",
+  "tools": [
+    {
+      "name": "echo_text",
+      "description": "从 JSON 参数中回显文本",
+      "parameters": {
+        "type": "object",
+        "properties": { "text": { "type": "string" } },
+        "required": ["text"],
+        "additionalProperties": false
+      },
+      "argv": ["python3", "/absolute/path/to/tool.py"],
+      "mutating": false,
+      "timeout_sec": 60
+    }
+  ],
+  "commands": [
+    {
+      "name": "quick-review",
+      "description": "运行插件提示模板",
+      "usage": "/quick-review <task>",
+      "output": "正在运行快速审查...",
+      "agent_input_template": "审查此任务：\\n{args}"
+    }
+  ],
+  "skills": [
+    {
+      "name": "plugin-skill",
+      "description": "一个插件提供的技能",
+      "content": "# 插件技能\\n\\n保持输出简洁。"
+    }
+  ]
+}

@@ -1,4 +1,12 @@
-"""Tooling layer for the nano code agent."""
+"""
+工具层模块 - 为代码 Agent 提供可调用的工具
+
+核心组件：
+- SandboxMode/ApprovalPolicy: 安全策略枚举
+- ToolContext: 共享上下文（工作区、审批回调等）
+- Tool/ToolRegistry: 工具定义和注册管理
+- 内置工具: list_files/read_file/write_file/replace_in_file/grep_files/exec_command/update_plan
+"""
 
 from __future__ import annotations
 
@@ -11,22 +19,37 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
+# 审批回调类型：接收操作名称和预览内容，返回是否允许执行
 ApprovalCallback = Callable[[str, str], bool]
 
 
 class SandboxMode(StrEnum):
-    READ_ONLY = "read-only"
-    WORKSPACE_WRITE = "workspace-write"
-    DANGER_FULL_ACCESS = "danger-full-access"
+    """沙箱模式 - 控制文件系统访问权限"""
+
+    READ_ONLY = "read-only"  # 只读模式，不能修改文件
+    WORKSPACE_WRITE = "workspace-write"  # 仅可读写工作区（默认）
+    DANGER_FULL_ACCESS = "danger-full-access"  # 无限制（危险）
 
 
 class ApprovalPolicy(StrEnum):
-    ON_REQUEST = "on-request"
-    ALWAYS = "always"
-    NEVER = "never"
+    """审批策略 - 控制是否需要用户确认"""
+
+    ON_REQUEST = "on-request"  # 按需确认（默认）
+    ALWAYS = "always"  # 总是需要确认
+    NEVER = "never"  # 从不执行任何工具调用
 
 
 def _is_within(base: Path, target: Path) -> bool:
+    """
+    检查 target 路径是否在 base 路径之内（用于沙箱限制）
+    
+    参数：
+    - base: 基础路径（通常是工作区）
+    - target: 待检查的目标路径
+    
+    返回：
+    - True 如果 target 在 base 之内，否则 False
+    """
     try:
         target.relative_to(base)
         return True
@@ -36,7 +59,16 @@ def _is_within(base: Path, target: Path) -> bool:
 
 @dataclass(slots=True)
 class ToolContext:
-    """Shared mutable context for tool handlers."""
+    """
+    工具共享上下文
+    
+    包含跨工具共享的状态和配置：
+    - cwd: 工作区目录
+    - ask_approval: 审批回调函数
+    - sandbox_mode: 沙箱安全模式
+    - approval_policy: 审批策略
+    - plan: 当前任务计划
+    """
 
     cwd: Path
     ask_approval: ApprovalCallback
@@ -45,11 +77,32 @@ class ToolContext:
     plan: list[dict[str, str]] = field(default_factory=list)
 
     def __post_init__(self) -> None:
+        """初始化后处理：标准化路径和枚举值"""
         self.cwd = self.cwd.expanduser().resolve()
         self.sandbox_mode = SandboxMode(self.sandbox_mode)
         self.approval_policy = ApprovalPolicy(self.approval_policy)
 
     def resolve_path(self, raw_path: str) -> Path:
+        """
+        解析并验证文件路径是否合法
+        如果沙箱不是无限制模式，检查路径是否在工作区，否则抛出异常
+        
+        步骤：
+        1. 展开用户目录 ~
+        2. 转换为绝对路径
+        3. 检查是否在工作区之内
+            如果在或者是无限制模式danger-full-access，返回解析后的绝对路径
+            如果不在，抛出 ValueError 异常
+        
+        参数：
+        - raw_path: 原始路径字符串
+        
+        返回：
+        - 解析后的绝对路径
+        
+        抛出：
+        - ValueError: 路径越出工作区
+        """
         candidate = Path(raw_path).expanduser()
         resolved = candidate.resolve() if candidate.is_absolute() else (self.cwd / candidate).resolve()
         if self.sandbox_mode != "danger-full-access" and not _is_within(self.cwd, resolved):
@@ -57,12 +110,22 @@ class ToolContext:
         return resolved
 
 
+# 工具处理器类型：接收上下文和参数，返回结果字符串
 ToolHandler = Callable[[ToolContext, dict[str, Any]], str]
 
 
 @dataclass(slots=True)
 class Tool:
-    """Function tool definition."""
+    """
+    函数工具定义
+    
+    字段：
+    - name: 工具名称
+    - description: 工具描述（给模型看的）
+    - parameters: JSON Schema 参数定义
+    - handler: 处理函数
+    - mutating: 是否是变异操作（修改文件/系统）
+    """
 
     name: str
     description: str
@@ -72,24 +135,39 @@ class Tool:
 
 
 class ToolRegistry:
-    """Runtime registry for all callable tools."""
+    """
+    工具运行时注册表
+    
+    功能：
+    - 注册工具
+    - 列出工具
+    - 转换成 OpenAI 工具格式
+    - 执行工具调用
+    """
 
     def __init__(self, context: ToolContext):
         self.context = context
         self._tools: dict[str, Tool] = {}
 
     def register(self, tool: Tool) -> None:
+        """注册一个新工具"""
         self._tools[tool.name] = tool
 
     def list_tools(self) -> list[Tool]:
-        """Return registered tools sorted by name."""
+        """返回已注册的工具列表（按名称排序）"""
         return [self._tools[name] for name in sorted(self._tools)]
 
     def list_tool_names(self) -> list[str]:
-        """Return registered tool names sorted alphabetically."""
+        """返回已注册的工具名称列表（按字母顺序）"""
         return [tool.name for tool in self.list_tools()]
 
     def as_openai_tools(self) -> list[dict[str, Any]]:
+        """
+        转换成 OpenAI 函数调用格式
+        
+        返回：
+        - 适合传递给 OpenAI API 的工具列表
+        """
         return [
             {
                 "type": "function",
@@ -103,10 +181,28 @@ class ToolRegistry:
         ]
 
     def execute(self, name: str, arguments_json: str) -> str:
+        """
+        执行工具调用
+        
+        执行流程：
+        1. 查找工具
+        2. 解析 JSON 参数
+        3. 应用沙箱和审批策略（如果是变异操作）
+        4. 执行工具处理器
+        5. 返回结果或错误
+        
+        参数：
+        - name: 工具名称
+        - arguments_json: JSON 格式的参数字符串
+        
+        返回：
+        - 工具执行结果字符串
+        """
         tool = self._tools.get(name)
         if tool is None:
             return f"Unknown tool: {name}"
 
+        # 解析 JSON 参数
         try:
             arguments = json.loads(arguments_json or "{}")
             if not isinstance(arguments, dict):
@@ -114,18 +210,23 @@ class ToolRegistry:
         except json.JSONDecodeError as exc:
             return f"Invalid tool arguments JSON: {exc}"
 
+        # 变异操作检查
         if tool.mutating:
+            # 沙箱检查
             if self.context.sandbox_mode == "read-only":
                 return "blocked by sandbox policy: read-only"
 
+            # 审批策略检查
             if self.context.approval_policy == "never":
                 return "blocked by approval policy: never"
 
+            # 按需审批
             if self.context.approval_policy == "on-request":
                 preview = json.dumps(arguments, ensure_ascii=True, indent=2)[:600]
                 if not self.context.ask_approval(f"{name}", preview):
                     return "Rejected by user."
 
+        # 执行工具
         try:
             return tool.handler(self.context, arguments)
         except Exception as exc:  # pragma: no cover - defensive
@@ -133,6 +234,15 @@ class ToolRegistry:
 
 
 def _list_files(ctx: ToolContext, args: dict[str, Any]) -> str:
+    """
+    list_files 工具实现
+    
+    功能：列出目录下的文件和文件夹
+    参数：
+    - path: 目标路径（默认 .）
+    - recursive: 是否递归（默认 True）
+    - max_entries: 最多返回条目数（默认 200，最大 2000）
+    """
     raw_path = str(args.get("path", "."))
     recursive = bool(args.get("recursive", True))
     max_entries = int(args.get("max_entries", 200))
@@ -155,6 +265,15 @@ def _list_files(ctx: ToolContext, args: dict[str, Any]) -> str:
 
 
 def _read_file(ctx: ToolContext, args: dict[str, Any]) -> str:
+    """
+    read_file 工具实现
+    
+    功能：读取文件内容，带行号
+    参数：
+    - path: 文件路径（必填）
+    - start_line: 起始行号（1-based，默认 1）
+    - num_lines: 读取行数（默认 200，最大 2000）
+    """
     raw_path = str(args["path"])
     start_line = int(args.get("start_line", 1))
     num_lines = int(args.get("num_lines", 200))
@@ -173,6 +292,15 @@ def _read_file(ctx: ToolContext, args: dict[str, Any]) -> str:
 
 
 def _write_file(ctx: ToolContext, args: dict[str, Any]) -> str:
+    """
+    write_file 工具实现
+    
+    功能：写入文件内容（创建或覆盖/追加）
+    参数：
+    - path: 文件路径（必填）
+    - content: 内容（必填）
+    - mode: 模式（overwrite/append，默认 overwrite）
+    """
     raw_path = str(args["path"])
     content = str(args.get("content", ""))
     mode = str(args.get("mode", "overwrite"))
@@ -189,6 +317,16 @@ def _write_file(ctx: ToolContext, args: dict[str, Any]) -> str:
 
 
 def _replace_in_file(ctx: ToolContext, args: dict[str, Any]) -> str:
+    """
+    replace_in_file 工具实现
+    
+    功能：在文件中替换指定文本
+    参数：
+    - path: 文件路径（必填）
+    - old: 旧文本（必填，必须精确匹配）
+    - new: 新文本（必填）
+    - count: 最多替换次数（默认 1）
+    """
     raw_path = str(args["path"])
     old = str(args["old"])
     new = str(args["new"])
@@ -206,6 +344,18 @@ def _replace_in_file(ctx: ToolContext, args: dict[str, Any]) -> str:
 
 
 def _grep_files(ctx: ToolContext, args: dict[str, Any]) -> str:
+    """
+    grep_files 工具实现
+    
+    功能：在文件中搜索文本模式
+    参数：
+    - pattern: 正则表达式（必填）
+    - path: 搜索路径（默认 .）
+    - glob: 文件匹配模式（如 *.py）
+    - max_results: 最多结果数（默认 200，最大 2000）
+    
+    优先使用 ripgrep (rg)，否则用内置扫描器
+    """
     pattern = str(args["pattern"])
     raw_path = str(args.get("path", "."))
     include = args.get("glob")
@@ -245,6 +395,14 @@ def _grep_files(ctx: ToolContext, args: dict[str, Any]) -> str:
 
 
 def _exec_command(ctx: ToolContext, args: dict[str, Any]) -> str:
+    """
+    exec_command 工具实现
+    
+    功能：执行 shell 命令
+    参数：
+    - command: 命令字符串（必填）
+    - timeout_sec: 超时秒数（默认 120，最大 1800）
+    """
     command = str(args["command"])
     timeout = int(args.get("timeout_sec", 120))
     timeout = max(1, min(timeout, 1800))
@@ -265,6 +423,13 @@ def _exec_command(ctx: ToolContext, args: dict[str, Any]) -> str:
 
 
 def _update_plan(ctx: ToolContext, args: dict[str, Any]) -> str:
+    """
+    update_plan 工具实现
+    
+    功能：更新任务计划
+    参数：
+    - plan: 计划数组，每个元素包含 step 和 status（pending/in_progress/completed）
+    """
     plan = args.get("plan")
     if not isinstance(plan, list):
         return "plan must be a list of {step, status}"
@@ -284,7 +449,18 @@ def _update_plan(ctx: ToolContext, args: dict[str, Any]) -> str:
 
 
 def create_default_registry(context: ToolContext) -> ToolRegistry:
-    """Build default nano agent tools."""
+    """
+    创建默认工具注册表
+    
+    包含 7 个内置工具：
+    1. list_files: 列出文件目录
+    2. read_file: 读取文件内容
+    3. grep_files: 搜索文件内容
+    4. write_file: 写入文件
+    5. replace_in_file: 替换文件内容
+    6. exec_command: 执行 shell 命令
+    7. update_plan: 更新任务计划
+    """
     registry = ToolRegistry(context)
     registry.register(
         Tool(
@@ -512,8 +688,8 @@ def create_default_registry(context: ToolContext) -> ToolRegistry:
                                     "description": "Current status of this step.",
                                 },
                             },
-                            "required": ["step", "status"],
-                            "additionalProperties": False,
+                            "required": ["step", "status"], # 必须包含 step 和 status
+                            "additionalProperties": False, #不允许额外的参数
                         },
                     }
                 },

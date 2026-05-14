@@ -16,3 +16,6 @@ CLAUDE.md
 # local research clones
 research/repos/
 docs/
+
+# 环境变量（包含敏感信息）
+.env
